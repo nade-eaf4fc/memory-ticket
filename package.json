@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node tests/export.test.mjs"
+    "test": "node tests/export.test.mjs && node tests/config-csv.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
