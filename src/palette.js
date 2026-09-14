@@ -6,6 +6,14 @@ export const palettes = [
   { id: 'matcha', name: 'Matcha', colors: ['#d7e5c5', '#e8ebcf', '#d7e6dc'] },
   { id: 'rose', name: 'Rose', colors: ['#f1cfdf', '#ecdaf0', '#f4e3dc'] },
   { id: 'tide', name: 'Tide', colors: ['#cbe8e2', '#d5e4ef', '#e6e9d3'] },
+  { id: 'peach', name: 'Peach', colors: ['#f4cdbd', '#f7ddd0', '#f3e7d5'] },
+  { id: 'lemon', name: 'Lemon', colors: ['#f3e2a7', '#f7edc7', '#e8ebce'] },
+  { id: 'coral', name: 'Coral', colors: ['#efc2bd', '#f3d1c5', '#efd8d6'] },
+  { id: 'mint', name: 'Mint', colors: ['#c8e4d6', '#daecdf', '#e5ead2'] },
+  { id: 'lilac', name: 'Lilac', colors: ['#cbc9ea', '#ded5ef', '#eadde9'] },
+  { id: 'sand', name: 'Sand', colors: ['#ddd2bd', '#ebe1cf', '#e5ded4'] },
+  { id: 'mist', name: 'Mist', colors: ['#d4dce0', '#e2e4e3', '#dedbe4'] },
+  { id: 'custom', name: 'Custom', colors: ['#d9cef1', '#f6d8c3', '#cbe8e2'] },
 ];
 
 export function extractPalette(image, createCanvas) {
@@ -32,5 +40,7 @@ export function extractPalette(image, createCanvas) {
 }
 
 export function selectedPalette(state) {
-  return state.color === 'auto' ? state.palette : palettes.find(p => p.id === state.color).colors;
+  if (state.color === 'auto') return state.palette;
+  if (state.color === 'custom') return state.customColors;
+  return palettes.find(p => p.id === state.color).colors;
 }
