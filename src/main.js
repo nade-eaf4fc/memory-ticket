@@ -59,6 +59,7 @@ $('#app').innerHTML = `
       </div></details>
     </aside>
   </main>
+  <footer class="site-footer"><span>© 2026 nade-eaf4fc</span><a href="https://github.com/nade-eaf4fc/memory-ticket" target="_blank" rel="noopener noreferrer">GitHub ↗</a></footer>
   <dialog id="crop-dialog" aria-labelledby="crop-title"><div class="dialog-heading"><h2 id="crop-title">画像のトリミング</h2><button class="close" data-crop-cancel aria-label="キャンセル">×</button></div><p>画像をドラッグして位置を調整できます。</p><div class="crop-viewport"><canvas aria-label="トリミングのプレビュー"></canvas></div><label class="crop-control">拡大 <output>100%</output><input type="range" name="zoom" min="1" max="4" step=".01"></label><div class="crop-positions"><label class="crop-control">左右<input type="range" name="x" min="0" max="1" step=".005"></label><label class="crop-control">上下<input type="range" name="y" min="0" max="1" step=".005"></label></div><div class="crop-actions"><button data-crop-reset class="button secondary">中央に戻す</button><button data-crop-apply class="button primary">適用する</button></div></dialog>
   <dialog id="share-dialog" aria-labelledby="share-title"><div class="dialog-heading"><h2 id="share-title">この一枚を、シェア。</h2><button class="close" id="close-share" aria-label="閉じる">×</button></div><p>このブラウザーでは画像を直接共有できません。PNGを保存し、投稿画面に添付してください。</p><button id="share-save" class="button primary">1. PNGを保存</button><a id="share-x" class="button secondary" target="_blank" rel="noopener noreferrer">2. Xの投稿画面を開く ↗</a><small>画像の添付と投稿は、ご自身で行ってください。</small></dialog>
 `;
