@@ -14,7 +14,7 @@ const state = {
   style: 'Pastel', color: 'auto', side: 'right', code: 'QR', title: 'A MOMENT, KEPT.',
   subtitle: '日々の景色を、一枚に。', date: '2026-09-14', serial: '001042',
   metadata: 'PERSONAL ARCHIVE / VOL. 01', qr: 'https://example.com', barcode: '260914-001042',
-  image: null, palette: palettes[0].colors, resolution: 2, face: 'front', crop: defaultCrop(), labels: {},
+  image: null, palette: palettes[0].colors, customColors: palettes.find(p => p.id === 'custom').colors.slice(), resolution: 2, face: 'front', crop: defaultCrop(), labels: {},
 };
 const faceKeys = ['image', 'crop', 'title', 'subtitle', 'metadata', 'filename', 'labels'];
 const faces = { front: {}, back: { image: null, crop: defaultCrop(), title: '', subtitle: '', metadata: '', filename: '', labels: {} } };
@@ -39,7 +39,7 @@ $('#app').innerHTML = `
       <label class="field hidden" id="back-message-field">裏面の文章 <small>任意</small><textarea id="back-message" data-focus="subtitle" maxlength="600" rows="5" placeholder="この一枚のことを、自由に。"></textarea></label>
       <p class="privacy">画像はこのブラウザー内だけで処理します。</p>
       <details class="advanced" id="design-options"><summary>色・レイアウト <span>＋</span></summary><div class="detail-content">
-        <fieldset class="color-field" data-focus="color"><legend>パステルカラー</legend><div class="color-grid">${palettes.map(p => `<button type="button" class="palette-option ${p.id === 'auto' ? 'active' : ''}" data-color="${p.id}" data-focus="color" aria-pressed="${p.id === 'auto'}"><i style="background:linear-gradient(120deg,${p.colors.join(',')})"></i><span>${p.name}</span></button>`).join('')}</div></fieldset>
+        <fieldset class="color-field" data-focus="color"><legend>パステルカラー</legend><div class="color-grid">${palettes.map(p => `<button type="button" class="palette-option ${p.id === 'auto' ? 'active' : ''}" data-color="${p.id}" data-focus="color" aria-pressed="${p.id === 'auto'}"><i style="background:linear-gradient(120deg,${p.colors.join(',')})"></i><span>${p.name}</span></button>`).join('')}</div><div id="custom-colors" hidden style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px"><label class="field">Color 1<input type="color" data-custom-color="0" data-focus="color" aria-label="カスタムカラー1" value="#d9cef1" style="height:44px;padding:4px"></label><label class="field">Color 2<input type="color" data-custom-color="1" data-focus="color" aria-label="カスタムカラー2" value="#f6d8c3" style="height:44px;padding:4px"></label><label class="field">Color 3<input type="color" data-custom-color="2" data-focus="color" aria-label="カスタムカラー3" value="#cbe8e2" style="height:44px;padding:4px"></label></div></fieldset>
         <label class="field">スタイル<select id="style" data-focus="style">${['Pastel', 'Museum', 'Retro'].map(s => `<option>${s}</option>`).join('')}</select></label>
         <label class="field">半券の位置<select id="side" data-focus="side"><option value="right">右側</option><option value="left">左側</option></select></label>
       </div></details>
@@ -173,6 +173,9 @@ async function render() {
     button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active));
   });
   $('[data-color="auto"] i').style.background = `linear-gradient(120deg,${state.palette.join(',')})`;
+  $('[data-color="custom"] i').style.background = `linear-gradient(120deg,${state.customColors.join(',')})`;
+  $('#custom-colors').hidden = state.color !== 'custom';
+  document.querySelectorAll('[data-custom-color]').forEach(input => { input.value = state.customColors[Number(input.dataset.customColor)]; });
   $('#crop-image').disabled = $('#remove-image').disabled = !state.image;
   try {
     const characters = Object.values(labels).join('') || 'A';
@@ -223,6 +226,9 @@ document.querySelectorAll('[data-reset-label]').forEach(button => button.addEven
 }));
 $('#resolution').addEventListener('change', event => { state.resolution = Number(event.target.value); render(); });
 document.querySelectorAll('[data-color]').forEach(button => button.addEventListener('click', () => { state.color = button.dataset.color; render(); }));
+document.querySelectorAll('[data-custom-color]').forEach(input => input.addEventListener('input', () => {
+  state.customColors[Number(input.dataset.customColor)] = input.value; render();
+}));
 $('.editor').addEventListener('focusin', event => focus(event.target.closest('[data-focus]')?.dataset.focus));
 $('.editor').addEventListener('focusout', event => { if (!event.relatedTarget?.closest('[data-focus]')) focus(null); });
 document.querySelectorAll('.advanced').forEach(details => details.addEventListener('toggle', () => { if (!details.open) focus(null); }));
