@@ -8,6 +8,7 @@ import { pngBlob, psdBlob, shareSupported, fileStem } from './export.js';
 import { attachTilt } from './tilt.js';
 import { attachCropDialog, defaultCrop } from './crop.js';
 import { labelFields, ticketLabels } from './labels.js';
+import { CONFIG_VERSION, configToCsv, csvToConfig } from './config-csv.js';
 
 const $ = selector => document.querySelector(selector);
 const state = {
@@ -30,6 +31,7 @@ $('#app').innerHTML = `
       <p id="status" class="status" role="status" aria-live="polite"></p>
       <a id="download-again" class="download-again hidden">保存が始まらない場合はこちら</a>
       <details class="layer-export"><summary>レイヤーで保存 <span>＋</span></summary><div class="layer-content"><button id="psd" class="button secondary" disabled>PSDを保存</button><p>背景・画像・文字・コードを要素ごとの画像レイヤーに分けます。文字の再入力はこの画面で行えます。</p><details class="clip-help"><summary>CLIP STUDIOで使うには</summary><p>PSDをCLIP STUDIO PAINTで開き、「別名で保存」で .clip を選びます。CLIPファイルの直接出力には未対応です。</p></details></div></details>
+      <details class="layer-export"><summary>設定を保存・復元 <span>＋</span></summary><div class="layer-content"><div class="image-actions"><button id="config-export" class="button secondary">CSVを保存</button><button id="config-import" class="button secondary">CSVを読み込む</button></div><input id="config-file" class="hidden" type="file" accept=".csv,text/csv"><p>設定CSV version ${CONFIG_VERSION}。文字・色・コード・表裏・トリミングなどを保存します。画像そのものはCSVに含まれないため、復元後に同じ画像を再選択してください。</p></div></details>
     </section>
     <aside class="editor" aria-label="チケットの編集">
       <div class="editor-intro"><span class="eyebrow">MAKE IT YOURS</span><span class="editor-mark" aria-hidden="true">01—</span></div>
@@ -85,6 +87,72 @@ function resizePreview() {
 }
 new ResizeObserver(resizePreview).observe($('.ticket-interaction'));
 window.addEventListener('resize', resizePreview);
+function storeCurrentFace() {
+  for (const key of faceKeys) faces[state.face][key] = state[key];
+}
+function filenameText() {
+  if (!state.filename) return state.image ? '画像を変更' : '画像なし · 任意で追加';
+  return state.image ? state.filename : `${state.filename} · 画像を再選択`;
+}
+function syncFaceUi() {
+  for (const key of ['title', 'subtitle', 'metadata']) $('#' + key).value = state[key] ?? '';
+  $('#back-message').value = state.subtitle ?? '';
+  $('#filename').textContent = filenameText();
+  $('#back-message-field').classList.toggle('hidden', state.face !== 'back');
+  $('#subtitle').closest('label').classList.toggle('hidden', state.face === 'back');
+  $('#title').placeholder = state.face === 'back' ? '裏面の見出し（任意）' : 'タイトル';
+  $('#flip').textContent = state.face === 'back' ? '↻ 表面を見る' : '↻ 裏面を見る';
+  $('#ticket').setAttribute('aria-label', state.face === 'back' ? '裏面のプレビュー' : '表面のプレビュー');
+  document.querySelectorAll('[data-face]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.face === state.face)));
+}
+function syncCommonUi() {
+  for (const key of ['date', 'serial', 'qr', 'barcode', 'side', 'code', 'style']) $('#' + key).value = state[key] ?? '';
+  $('#resolution').value = String(state.resolution);
+}
+function normalizeCrop(crop) {
+  const clamp = (value, min, max, fallback) => Number.isFinite(Number(value)) ? Math.max(min, Math.min(max, Number(value))) : fallback;
+  return { x: clamp(crop?.x, 0, 1, .5), y: clamp(crop?.y, 0, 1, .5), zoom: clamp(crop?.zoom, 1, 4, 1) };
+}
+function configFace(face) {
+  return {
+    title: face?.title ?? '', subtitle: face?.subtitle ?? '', metadata: face?.metadata ?? '', filename: face?.filename ?? '',
+    crop: normalizeCrop(face?.crop), labels: { ...(face?.labels ?? {}) },
+  };
+}
+function currentConfig() {
+  storeCurrentFace();
+  return {
+    activeFace: state.face, style: state.style, color: state.color, palette: state.palette.slice(), customColors: state.customColors.slice(),
+    side: state.side, code: state.code, resolution: state.resolution, date: state.date, serial: state.serial, qr: state.qr, barcode: state.barcode,
+    front: configFace(faces.front), back: configFace(faces.back),
+  };
+}
+function validColor(value, fallback) {
+  return typeof value === 'string' && value && globalThis.CSS?.supports?.('color', value) ? value : fallback;
+}
+async function applyConfig(config) {
+  const styles = ['Pastel', 'Museum', 'Retro'], sides = ['left', 'right'], codes = ['None', 'QR', 'Barcode', 'Both'];
+  if (!styles.includes(config.style)) throw new Error('CSVのスタイル設定が不正です。');
+  if (!palettes.some(p => p.id === config.color)) throw new Error('CSVのカラー設定が不正です。');
+  if (!sides.includes(config.side) || !codes.includes(config.code) || ![1, 2, 3].includes(config.resolution)) throw new Error('CSVのレイアウト設定が不正です。');
+  ++imageRevision;
+  const fallbackPalette = palettes[0].colors;
+  state.style = config.style; state.color = config.color; state.side = config.side; state.code = config.code;
+  state.resolution = config.resolution; state.date = config.date; state.serial = config.serial; state.qr = config.qr; state.barcode = config.barcode;
+  state.palette = config.palette.map((color, i) => validColor(color, fallbackPalette[i]));
+  const customDefault = palettes.find(p => p.id === 'custom').colors;
+  state.customColors = config.customColors.map((color, i) => validColor(color, customDefault[i]));
+  for (const face of ['front', 'back']) {
+    const saved = configFace(config[face]);
+    faces[face] = { ...saved, image: null };
+  }
+  state.face = config.activeFace === 'back' ? 'back' : 'front';
+  Object.assign(state, faces[state.face], { face: state.face });
+  syncCommonUi(); syncFaceUi(); focus(null);
+  await render();
+  const names = [faces.front.filename, faces.back.filename].filter(Boolean);
+  status(`設定CSV v${config.version}を読み込みました。${names.length ? '画像は含まれないため、保存時と同じ画像を再選択してください。' : ''}`);
+}
 async function changeFace(face) {
   if (flipping || busy || face === state.face) return;
   flipping = true; setReady(false); tilt.suspend(true);
@@ -98,17 +166,9 @@ async function changeFace(face) {
       outgoing = surface.animate([{ transform: 'perspective(1400px) rotateY(0deg)' }, { transform: 'perspective(1400px) rotateY(90deg)' }], { duration: 230, easing: 'ease-in', fill: 'forwards' });
       await outgoing.finished;
     }
-    for (const key of faceKeys) faces[state.face][key] = state[key];
+    storeCurrentFace();
     Object.assign(state, faces[face], { face });
-    for (const key of ['title', 'subtitle', 'metadata']) $('#' + key).value = state[key];
-    $('#back-message').value = state.subtitle;
-    $('#filename').textContent = state.filename || '画像なし · 任意で追加';
-    $('#back-message-field').classList.toggle('hidden', face !== 'back');
-    $('#subtitle').closest('label').classList.toggle('hidden', face === 'back');
-    $('#title').placeholder = face === 'back' ? '裏面の見出し（任意）' : 'タイトル';
-    $('#flip').textContent = face === 'back' ? '↻ 表面を見る' : '↻ 裏面を見る';
-    $('#ticket').setAttribute('aria-label', face === 'back' ? '裏面のプレビュー' : '表面のプレビュー');
-    document.querySelectorAll('[data-face]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.face === face)));
+    syncFaceUi();
     focus(null); await render();
     outgoing?.cancel();
     if (motion) await surface.animate([{ transform: 'perspective(1400px) rotateY(-90deg)' }, { transform: 'perspective(1400px) rotateY(0deg)' }], { duration: 300, easing: 'ease-out' }).finished;
@@ -199,13 +259,14 @@ async function loadImage(file) {
   if (!/^image\/(jpeg|png|webp|avif)$/.test(file.type)) { status('PNG・JPEG・WebP・AVIFの画像を選んでください。', true); return; }
   if (file.size > 30 * 1024 * 1024) { status('30MB以下の画像を選んでください。', true); return; }
   const face = state.face;
+  const keepCrop = !state.image && !!state.filename && state.filename === file.name;
   const id = ++imageRevision, url = URL.createObjectURL(file), image = new Image();
   setReady(false); status('画像を読み込んでいます…');
   try {
     image.src = url; await image.decode();
     if (id !== imageRevision || face !== state.face) return;
     if (image.width * image.height > 60000000) throw Error('large');
-    state.image = image; state.crop = defaultCrop(); state.filename = file.name;
+    state.image = image; state.crop = keepCrop ? normalizeCrop(state.crop) : defaultCrop(); state.filename = file.name;
     if (state.face === 'front') state.palette = extractPalette(image, createBrowserCanvas);
     $('#filename').textContent = file.name;
     await render();
@@ -236,6 +297,18 @@ $('#upload').addEventListener('change', event => { loadImage(event.target.files[
 document.addEventListener('dragover', event => { event.preventDefault(); $('.upload').classList.add('dragging'); focus('image'); });
 document.addEventListener('dragleave', event => { if (!event.relatedTarget) { $('.upload').classList.remove('dragging'); focus(null); } });
 document.addEventListener('drop', event => { event.preventDefault(); $('.upload').classList.remove('dragging'); loadImage(event.dataTransfer.files[0]); focus(null); });
+$('#config-export').addEventListener('click', () => {
+  const csv = configToCsv(currentConfig());
+  download(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'csv', state.serial, 'settings');
+  status(`設定CSV v${CONFIG_VERSION}を作成しました。`);
+});
+$('#config-import').addEventListener('click', () => $('#config-file').click());
+$('#config-file').addEventListener('change', async event => {
+  const file = event.target.files[0]; event.target.value = '';
+  if (!file) return;
+  try { await applyConfig(csvToConfig(await file.text())); }
+  catch (error) { status(error?.message || '設定CSVを読み込めませんでした。', true); }
+});
 $('#export').addEventListener('click', () => { if (ready) download(png, 'png'); });
 $('#psd').addEventListener('click', async () => {
   if (!ready || busy) return;
