@@ -1,0 +1,7 @@
+node_modules/
+work/
+.sites-runtime/
+outputs/
+.env
+.env.*
+!.env.example
